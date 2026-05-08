@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+const PDFJS_CDN_BASE = "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284";
 
 type AssetDetails = {
   id: string;
@@ -94,10 +95,9 @@ export function AssetPreviewModal({ open, onOpenChange, assetId }: Props) {
 
     const renderThumb = async () => {
       try {
-        const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+        const pdfjsLib = await import(`${PDFJS_CDN_BASE}/legacy/build/pdf.min.mjs`);
         setPdfThumbError(null);
-        // Worker setup for bundlers
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN_BASE}/build/pdf.worker.min.mjs`;
 
         const loadingTask = pdfjsLib.getDocument(signedUrl);
         const doc = await loadingTask.promise;

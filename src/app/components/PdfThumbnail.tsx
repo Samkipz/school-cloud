@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const previewUrlCache = new Map<string, string>();
+const PDFJS_CDN_BASE = "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284";
 
 type Props = {
   assetId: string;
@@ -49,12 +50,9 @@ export function PdfThumbnail({ assetId, enabled = true, className, scale = 0.6 }
 
     const render = async () => {
       try {
-        const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+        const pdfjsLib = await import(`${PDFJS_CDN_BASE}/legacy/build/pdf.min.mjs`);
         setStatus("loading");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url,
-        ).toString();
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN_BASE}/build/pdf.worker.min.mjs`;
 
         const loadingTask = pdfjsLib.getDocument(previewUrl);
         const doc = await loadingTask.promise;
