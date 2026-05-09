@@ -38,7 +38,7 @@ export type LayoutShellProps = {
 };
 
 export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutShellProps) {
-  const { session } = useSession();
+  const { update } = useSession();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -196,7 +196,7 @@ export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutSh
                         }
                         setActivePersona("teacher");
                         toast.success("Switched to teacher view.");
-                        await session?.reload();
+                        await update();
                         router.push("/");
                         router.refresh();
                       } catch (e) {
@@ -231,7 +231,7 @@ export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutSh
                         }
                         setActivePersona("admin");
                         toast.success("Switched to admin view.");
-                        await session?.reload();
+                        await update();
                         router.push("/admin");
                         router.refresh();
                       } catch (e) {
