@@ -1,8 +1,9 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
-import { eq, or } from "drizzle-orm";
+import { NextAuthOptions, getServerSession } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
-import { normalizePhoneE164, tryNormalizePhoneE164 } from "@/lib/phone";
 import { normalizeClassName, type AdminPersona, type PolicyActor } from "@/lib/policy";
 import {
   classTeacherAssignments,
@@ -12,16 +13,16 @@ import {
 } from "@/lib/schema";
 
 const roleSchema = z.enum(["admin", "teacher", "marketing", "student"]);
-const moduleSchema = z.enum(["portfolio", "resources", "media", "tools"]);
 
 export type AppRole = z.infer<typeof roleSchema>;
-export type AppModule = z.infer<typeof moduleSchema>;
+export type AppModule = "portfolio" | "resources" | "media" | "tools";
+
+export type AdminPersona = "admin" | "teacher";
 
 export type RequestActor = {
   userId: string;
   email: string | null;
   phone: string | null;
-  /** Effective role for module access and data scoping. */
   role: AppRole;
   baseRole: AppRole;
   persona: AdminPersona;
@@ -33,28 +34,6 @@ export type RequestActor = {
 function parseRole(value: unknown): AppRole {
   const parsed = roleSchema.safeParse(value);
   return parsed.success ? parsed.data : "teacher";
-}
-
-function parseAdminEmails() {
-  const value = process.env.ADMIN_EMAILS ?? "";
-  return new Set(
-    value
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
-
-function parseAdminPhones() {
-  const value = process.env.ADMIN_PHONES ?? "";
-  const set = new Set<string>();
-  for (const part of value.split(",")) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    const r = normalizePhoneE164(trimmed);
-    if (r.ok) set.add(r.value);
-  }
-  return set;
 }
 
 function parsePersona(value: unknown, baseRole: AppRole): AdminPersona {
@@ -91,8 +70,6 @@ async function loadTeacherAssignments(dbUserId: string) {
       classAssignments: classRows,
     };
   } catch (err) {
-    // If the migration adding these tables hasn't been applied yet, avoid crashing auth.
-    // We'll fall back to "unscoped teacher" behavior (no assignments) until migration completes.
     const maybeCode =
       err && typeof err === "object" && "cause" in err
         ? String(((err as { cause?: { code?: string } }).cause?.code ?? ""))
@@ -122,111 +99,102 @@ export function toPolicyActor(actor: RequestActor): PolicyActor {
   };
 }
 
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        username: { label: "Username", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.username || !credentials?.password) {
+          return null;
+        }
+
+        const normalizedUsername = credentials.username.trim();
+        if (!normalizedUsername) return null;
+
+        const db = getDb();
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(sql`lower(${users.username}) = lower(${normalizedUsername})`)
+          .limit(1);
+
+        if (!user || !user.passwordHash) {
+          return null;
+        }
+
+        const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+        if (!isValid) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          fullName: user.fullName,
+        };
+      },
+    }),
+  ],
+  session: {
+    strategy: "jwt",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = user.role;
+        token.fullName = user.fullName;
+        token.dbUserId = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.sub!;
+        session.user.role = token.role as AppRole;
+        session.user.fullName = token.fullName as string;
+        session.user.dbUserId = token.dbUserId as string;
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: "/sign-in",
+  },
+};
+
 export async function getRequestActor(): Promise<RequestActor | null> {
-  const { userId } = await auth();
-  if (!userId) return null;
-
-  const clerk = await clerkClient();
-  const user = await clerk.users.getUser(userId);
-  const email = user.primaryEmailAddress?.emailAddress || user.emailAddresses[0]?.emailAddress || null;
-  const phoneRaw =
-    user.primaryPhoneNumber?.phoneNumber || user.phoneNumbers[0]?.phoneNumber || null;
-  if (!email && !phoneRaw) return null;
-
-  const phoneNorm = tryNormalizePhoneE164(phoneRaw);
-  const normalizedEmail = email?.toLowerCase() ?? null;
-  const adminEmails = parseAdminEmails();
-  const adminPhones = parseAdminPhones();
-  const bootstrapAdminEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
-  const bootstrapPhoneRaw = process.env.BOOTSTRAP_ADMIN_PHONE?.trim();
-  const bootstrapAdminPhone = bootstrapPhoneRaw
-    ? tryNormalizePhoneE164(bootstrapPhoneRaw) ?? bootstrapPhoneRaw
-    : null;
-
-  const metadataRole = parseRole(user.publicMetadata?.role);
-  const desiredBaseRole: AppRole =
-    (bootstrapAdminEmail && normalizedEmail === bootstrapAdminEmail) ||
-    (bootstrapAdminPhone && phoneNorm && bootstrapAdminPhone === phoneNorm) ||
-    (bootstrapAdminPhone && phoneRaw && bootstrapAdminPhone === phoneRaw)
-      ? "admin"
-      : (normalizedEmail && adminEmails.has(normalizedEmail)) ||
-          (phoneNorm && adminPhones.has(phoneNorm)) ||
-          (phoneRaw && adminPhones.has(phoneRaw))
-        ? "admin"
-        : metadataRole;
-
-  const persona = parsePersona(user.publicMetadata?.activePersona, desiredBaseRole);
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return null;
 
   const db = getDb();
-  const matchClauses = [];
-  if (email) matchClauses.push(eq(users.email, email));
-  if (phoneNorm) matchClauses.push(eq(users.phone, phoneNorm));
-  if (phoneRaw && phoneNorm !== phoneRaw) matchClauses.push(eq(users.phone, phoneRaw));
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.dbUserId))
+    .limit(1);
 
-  const existing = matchClauses.length
-    ? await db
-        .select({ id: users.id, role: users.role })
-        .from(users)
-        .where(or(...matchClauses))
-        .limit(1)
-    : [];
+  if (!user) return null;
 
-  const finalize = async (dbUserId: string): Promise<RequestActor> => {
-    const { learningAreas: la, classAssignments: ca } = await loadTeacherAssignments(dbUserId);
-    return {
-      userId,
-      email,
-      phone: phoneNorm ?? phoneRaw,
-      role: effectiveRoleFrom(desiredBaseRole, persona),
-      baseRole: desiredBaseRole,
-      persona,
-      dbUserId,
-      learningAreas: la,
-      classAssignments: ca,
-    };
+  const { learningAreas: la, classAssignments: ca } = await loadTeacherAssignments(user.id);
+
+  return {
+    userId: session.user.id,
+    email: user.email,
+    phone: user.phone,
+    role: parseRole(user.role),
+    baseRole: parseRole(user.role),
+    persona: parsePersona(null, parseRole(user.role)), // Default persona logic
+    dbUserId: user.id,
+    learningAreas: la,
+    classAssignments: ca,
   };
-
-  if (existing[0]) {
-    const storedRole = parseRole(existing[0].role);
-    if (desiredBaseRole !== storedRole) {
-      await db.update(users).set({ role: desiredBaseRole }).where(eq(users.id, existing[0].id));
-    }
-    return finalize(existing[0].id);
-  }
-
-  const insertPhone = phoneNorm ?? phoneRaw;
-  try {
-    const inserted = await db
-      .insert(users)
-      .values({
-        fullName: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "School User",
-        email,
-        phone: insertPhone ?? undefined,
-        role: desiredBaseRole,
-        department: "General",
-      })
-      .returning({ id: users.id, role: users.role });
-
-    return finalize(inserted[0].id);
-  } catch (error) {
-    const maybeExisting = matchClauses.length
-      ? await db
-          .select({ id: users.id, role: users.role })
-          .from(users)
-          .where(or(...matchClauses))
-          .limit(1)
-      : [];
-
-    if (!maybeExisting[0]) {
-      throw error;
-    }
-
-    const storedRole = parseRole(maybeExisting[0].role);
-    if (desiredBaseRole !== storedRole) {
-      await db.update(users).set({ role: desiredBaseRole }).where(eq(users.id, maybeExisting[0].id));
-    }
-    return finalize(maybeExisting[0].id);
-  }
 }
 
 export async function getRequestRole() {
@@ -248,6 +216,6 @@ export function canUploadModule(role: AppRole, moduleName: AppModule) {
   return false;
 }
 
-export function canManageUsers(actor: RequestActor) {
+export function canManageUsers(actor: RequestActor): boolean {
   return actor.baseRole === "admin" && actor.persona === "admin";
 }

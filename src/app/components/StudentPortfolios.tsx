@@ -103,6 +103,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
   const [portfolioSubject, setPortfolioSubject] = useState("All");
   const [portfolioType, setPortfolioType] = useState("All");
   const [portfolioFileView, setPortfolioFileView] = useState<"grid" | "list">("grid");
+  const [portfolioSearchQuery, setPortfolioSearchQuery] = useState("");
   const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
 
   const [catalogGrades, setCatalogGrades] = useState<GradeOption[]>([]);
@@ -185,6 +186,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
     setPortfolioDetail(null);
     setPortfolioSubject("All");
     setPortfolioType("All");
+    setPortfolioSearchQuery("");
     setPortfolioFileView("grid");
     try {
       const response = await fetch(`/api/students/${studentId}/portfolio`);
@@ -204,6 +206,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
     setPreviewAssetId(null);
     setPortfolioSubject("All");
     setPortfolioType("All");
+    setPortfolioSearchQuery("");
     setPortfolioFileView("grid");
     setPortfolioLoading(false);
   };
@@ -232,9 +235,26 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
       const subjectOk =
         portfolioSubject === "All" ||
         (portfolioSubject === "Untagged" ? f.tags.length === 0 : f.tags.includes(portfolioSubject));
-      return typeOk && subjectOk;
+      const query = portfolioSearchQuery.trim().toLowerCase();
+      const searchOk =
+        query.length === 0 ||
+        f.title.toLowerCase().includes(query) ||
+        f.uploadedByName.toLowerCase().includes(query) ||
+        f.tags.some((t) => t.toLowerCase().includes(query));
+      return typeOk && subjectOk && searchOk;
     });
-  }, [portfolioDetail, portfolioSubject, portfolioType]);
+  }, [portfolioDetail, portfolioSearchQuery, portfolioSubject, portfolioType]);
+
+  const isPortfolioOpen = portfolioLoading || Boolean(portfolioDetail);
+  const learnerInitials = useMemo(() => {
+    if (!portfolioDetail?.student.fullName) return "LP";
+    return portfolioDetail.student.fullName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("");
+  }, [portfolioDetail]);
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
@@ -267,116 +287,162 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
         assetId={previewAssetId}
       />
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-[#1e293b] mb-1">Student Portfolios</h1>
-        <p className="text-[#64748b]">
-          Structured evidence of learning per learner — organized by tags (learning areas) and easy to review for CBC.
-        </p>
-        {isLoading && <p className="text-xs text-[#94a3b8] mt-2">Loading students…</p>}
-        {loadError && <p className="text-xs text-[#ef4444] mt-2">{loadError}</p>}
-      </div>
+      {!isPortfolioOpen && (
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-[#1e293b] mb-1">Student Portfolios</h1>
+          <p className="text-[#64748b]">
+            Structured file evidence per learner.
+          </p>
+          {isLoading && <p className="text-xs text-[#94a3b8] mt-2">Loading students…</p>}
+          {loadError && <p className="text-xs text-[#ef4444] mt-2">{loadError}</p>}
+        </div>
+      )}
 
-      <div className="bg-white rounded-xl border border-[#e3e6ef] p-4 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
-            <div className="flex-1 relative min-w-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
-              <input
-                type="text"
-                placeholder="Search learners by name…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-[#f8f9fc] border border-[#e3e6ef] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
-              />
+      {!isPortfolioOpen && (
+        <div className="bg-white rounded-xl border border-[#e3e6ef] p-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
+              <div className="flex-1 relative min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
+                <input
+                  type="text"
+                  placeholder="Search learners by name…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f8f9fc] border border-[#e3e6ef] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+                />
+              </div>
+              <select
+                value={selectedGrade}
+                onChange={(e) => setSelectedGrade(e.target.value)}
+                className="px-3 py-2 bg-[#f8f9fc] border border-[#e3e6ef] rounded-lg text-sm text-[#1e293b] shrink-0"
+              >
+                {gradeFilterOptions.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              {canManageStudents && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingStudent(null);
+                    setStudentDialogOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white text-sm whitespace-nowrap shrink-0"
+                >
+                  Add student
+                </button>
+              )}
             </div>
-            <select
-              value={selectedGrade}
-              onChange={(e) => setSelectedGrade(e.target.value)}
-              className="px-3 py-2 bg-[#f8f9fc] border border-[#e3e6ef] rounded-lg text-sm text-[#1e293b] shrink-0"
-            >
-              {gradeFilterOptions.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-            {canManageStudents && (
+            <div className="flex items-center gap-2 bg-[#f8f9fc] p-1 rounded-lg border border-[#e3e6ef] self-end lg:self-center">
               <button
                 type="button"
-                onClick={() => {
-                  setEditingStudent(null);
-                  setStudentDialogOpen(true);
-                }}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white text-sm whitespace-nowrap shrink-0"
+                onClick={() => setDirectoryView("grid")}
+                className={`p-2 rounded-md transition-all ${directoryView === "grid" ? "bg-white text-[#2563eb] shadow-sm" : "text-[#64748b]"}`}
+                aria-label="Grid"
               >
-                Add student
+                <Grid className="w-4 h-4" />
               </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2 bg-[#f8f9fc] p-1 rounded-lg border border-[#e3e6ef] self-end lg:self-center">
-            <button
-              type="button"
-              onClick={() => setDirectoryView("grid")}
-              className={`p-2 rounded-md transition-all ${directoryView === "grid" ? "bg-white text-[#2563eb] shadow-sm" : "text-[#64748b]"}`}
-              aria-label="Grid"
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setDirectoryView("list")}
-              className={`p-2 rounded-md transition-all ${directoryView === "list" ? "bg-white text-[#2563eb] shadow-sm" : "text-[#64748b]"}`}
-              aria-label="List"
-            >
-              <List className="w-4 h-4" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryView("list")}
+                className={`p-2 rounded-md transition-all ${directoryView === "list" ? "bg-white text-[#2563eb] shadow-sm" : "text-[#64748b]"}`}
+                aria-label="List"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {(portfolioLoading || portfolioDetail) ? (
-        <div className="bg-white rounded-xl border border-[#e3e6ef] overflow-hidden">
-          <div className="border-b border-[#e3e6ef] bg-[#f8fafc] px-5 py-4">
-            <div className="flex flex-wrap items-center gap-3 justify-between">
+      {isPortfolioOpen ? (
+        <div className="bg-white rounded-2xl border border-[#dbe5f0] shadow-[0_20px_60px_-48px_rgba(15,23,42,0.45)] overflow-hidden">
+          <div className="border-b border-[#e6edf5] bg-[radial-gradient(circle_at_15%_15%,#eff6ff_0%,#f8fafc_42%,#ecfdf5_100%)] px-5 py-5 sm:px-7 sm:py-7">
+            <div className="flex flex-wrap items-center gap-3 justify-between mb-4">
               <button
                 type="button"
                 onClick={closePortfolio}
-                className="inline-flex items-center gap-1 text-sm text-[#2563eb] hover:text-[#1d4ed8]"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8]"
               >
                 <ChevronRight className="w-4 h-4 rotate-180" />
                 Back to learners
               </button>
             </div>
-            <div className="mt-2">
-              <h2 className="text-xl text-[#1e293b] pr-2">
-                {portfolioLoading ? "Loading portfolio…" : portfolioDetail?.student.fullName ?? "Portfolio"}
-              </h2>
-              <p className="text-[#64748b] text-sm">
-                {portfolioDetail && (
-                  <>
-                    <span className="font-medium text-[#475569]">{portfolioDetail.student.grade}</span>
-                    {portfolioDetail.student.className ? (
-                      <span className="text-[#94a3b8]"> · {portfolioDetail.student.className}</span>
-                    ) : null}
-                    <span className="text-[#94a3b8]"> · {portfolioDetail.student.admissionNumber}</span>
-                  </>
-                )}
-                {!portfolioLoading && portfolioDetail && (
-                  <span className="block mt-1 text-xs text-[#94a3b8]">
-                    Evidence of learning — newest first. Filter by learning area (tags) or file type.
-                  </span>
-                )}
-              </p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#10b981] text-white flex items-center justify-center font-semibold shadow-sm">
+                  {learnerInitials}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[#64748b] mb-1">Learner file</p>
+                  <h2 className="text-[1.7rem] leading-tight font-semibold text-[#0f172a] pr-2 truncate">
+                    {portfolioLoading ? "Loading portfolio…" : portfolioDetail?.student.fullName ?? "Portfolio"}
+                  </h2>
+                  <p className="text-[#64748b] text-sm mt-1.5">
+                    {portfolioDetail && (
+                      <>
+                        <span className="font-medium text-[#334155]">{portfolioDetail.student.grade}</span>
+                        {portfolioDetail.student.className ? (
+                          <span className="text-[#94a3b8]"> · {portfolioDetail.student.className}</span>
+                        ) : null}
+                        <span className="text-[#94a3b8]"> · Adm {portfolioDetail.student.admissionNumber}</span>
+                      </>
+                    )}
+                    {!portfolioLoading && portfolioDetail && (
+                      <span className="block mt-1.5 text-xs text-[#94a3b8]">
+                        Curated learning evidence with quick preview and download actions.
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="hidden lg:flex rounded-xl border border-white/70 bg-white/70 backdrop-blur px-3 py-2 text-right">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-[#94a3b8]">Academic year</p>
+                  <p className="text-sm font-semibold text-[#1e293b]">2026</p>
+                </div>
+              </div>
             </div>
 
             {portfolioDetail && !portfolioLoading && (
-              <div className="mt-4 flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Learning area</span>
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
+                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Total evidence</p>
+                  <p className="text-xl font-semibold text-[#0f172a]">{portfolioDetail.files.length}</p>
+                </div>
+                <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
+                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Visible now</p>
+                  <p className="text-xl font-semibold text-[#0f172a]">{filteredPortfolioFiles.length}</p>
+                </div>
+                <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
+                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Learning areas</p>
+                  <p className="text-xl font-semibold text-[#0f172a]">{Math.max(subjectOptions.length - 1, 0)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {portfolioDetail && !portfolioLoading && (
+            <div className="px-5 pt-4 sm:px-7">
+              <div className="bg-[#f8fafc] border border-[#e3e6ef] rounded-2xl p-3 sm:p-4 flex flex-col xl:flex-row gap-3 xl:items-center xl:justify-between">
+                <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
+                    <input
+                      type="text"
+                      placeholder="Search evidence title, tag, or uploader…"
+                      value={portfolioSearchQuery}
+                      onChange={(e) => setPortfolioSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 bg-white border border-[#e3e6ef] rounded-xl text-sm text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+                    />
+                  </div>
                   <select
                     value={portfolioSubject}
                     onChange={(e) => setPortfolioSubject(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-[#e3e6ef] rounded-lg text-sm text-[#1e293b]"
+                    className="px-3 py-2.5 bg-white border border-[#e3e6ef] rounded-xl text-sm text-[#1e293b]"
                   >
                     {subjectOptions.map((s) => (
                       <option key={s} value={s}>
@@ -386,11 +452,11 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                   </select>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Filter className="w-4 h-4 text-[#64748b]" />
+                  <Filter className="w-4 h-4 text-[#64748b] ml-1" />
                   <select
                     value={portfolioType}
                     onChange={(e) => setPortfolioType(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-[#e3e6ef] rounded-lg text-sm text-[#1e293b]"
+                    className="px-3 py-2.5 bg-white border border-[#e3e6ef] rounded-xl text-sm text-[#1e293b]"
                   >
                     <option>All</option>
                     <option>PDF</option>
@@ -398,11 +464,11 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                     <option>Image</option>
                     <option>Document</option>
                   </select>
-                  <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-[#e3e6ef] ml-1">
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-[#e3e6ef] ml-1">
                     <button
                       type="button"
                       onClick={() => setPortfolioFileView("grid")}
-                      className={`p-1.5 rounded ${portfolioFileView === "grid" ? "bg-[#f1f5f9] text-[#2563eb]" : "text-[#64748b]"}`}
+                      className={`p-1.5 rounded ${portfolioFileView === "grid" ? "bg-[#f1f5f9] text-[#2563eb] shadow-sm" : "text-[#64748b]"}`}
                       aria-label="Grid view"
                     >
                       <Grid className="w-4 h-4" />
@@ -410,7 +476,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                     <button
                       type="button"
                       onClick={() => setPortfolioFileView("list")}
-                      className={`p-1.5 rounded ${portfolioFileView === "list" ? "bg-[#f1f5f9] text-[#2563eb]" : "text-[#64748b]"}`}
+                      className={`p-1.5 rounded ${portfolioFileView === "list" ? "bg-[#f1f5f9] text-[#2563eb] shadow-sm" : "text-[#64748b]"}`}
                       aria-label="List view"
                     >
                       <List className="w-4 h-4" />
@@ -418,20 +484,26 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div className="p-4 sm:p-5 bg-white">
+          <div className="p-5 sm:p-7 bg-white">
             {portfolioLoading && <p className="text-sm text-[#94a3b8]">Loading evidence…</p>}
             {!portfolioLoading && portfolioDetail && portfolioDetail.files.length === 0 && (
-              <p className="text-sm text-[#94a3b8] text-center py-12">No portfolio files linked yet. Upload via Student Portfolio and pick this learner.</p>
+              <div className="rounded-2xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] text-center py-14 px-6">
+                <p className="text-sm text-[#64748b]">No portfolio files linked yet for this learner.</p>
+                <p className="text-xs text-[#94a3b8] mt-1">Upload evidence from Student Portfolio and assign this learner.</p>
+              </div>
             )}
             {!portfolioLoading && portfolioDetail && filteredPortfolioFiles.length === 0 && portfolioDetail.files.length > 0 && (
-              <p className="text-sm text-[#94a3b8] text-center py-8">No files match these filters.</p>
+              <div className="rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] text-center py-10 px-6">
+                <p className="text-sm font-medium text-[#475569]">No files match your current filters.</p>
+                <p className="text-xs text-[#94a3b8] mt-1">Try clearing keyword search, learning area, or file type.</p>
+              </div>
             )}
 
             {!portfolioLoading && portfolioDetail && portfolioFileView === "grid" && filteredPortfolioFiles.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                 {filteredPortfolioFiles.map((file, index) => {
                   const kind = evidenceKind(file.mimeType);
                   const { icon: Icon, bg, color } = fileIconMeta(kind);
@@ -439,35 +511,40 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                   return (
                     <div
                       key={file.id}
-                      className="bg-[#f8fafc] rounded-xl border border-[#e3e6ef] p-4 hover:border-[#2563eb]/30 transition-colors"
+                      className="group bg-white rounded-2xl border border-[#e3e6ef] p-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.5)] hover:shadow-[0_20px_48px_-28px_rgba(15,23,42,0.45)] hover:border-[#c7d2fe] transition-all"
                     >
-                      <div className={`w-full aspect-[4/3] ${bg} rounded-lg flex items-center justify-center overflow-hidden mb-3`}>
+                      <div className={`w-full aspect-[4/3] ${bg} rounded-xl flex items-center justify-center overflow-hidden mb-3`}>
                         {isPdf ? (
                           <PdfThumbnail assetId={file.id} enabled={index < 12} className="w-full h-full object-cover" scale={0.5} />
                         ) : (
                           <Icon className={`w-12 h-12 ${color}`} />
                         )}
                       </div>
-                      <h3 className="font-medium text-[#1e293b] text-sm mb-2 line-clamp-2">{file.title}</h3>
-                      <div className="flex flex-wrap gap-1 mb-2">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="font-semibold text-[#1e293b] text-sm line-clamp-2">{file.title}</h3>
+                        <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full bg-[#f1f5f9] text-[#64748b] shrink-0">
+                          {kind}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
                         {file.tags.length === 0 ? (
-                          <span className="text-xs bg-[#f1f5f9] text-[#64748b] px-2 py-0.5 rounded">No tags</span>
+                          <span className="text-xs bg-[#f1f5f9] text-[#64748b] px-2 py-0.5 rounded-full">No tags</span>
                         ) : (
                           file.tags.slice(0, 4).map((t) => (
-                            <span key={t} className="text-xs bg-[#dbeafe] text-[#2563eb] px-2 py-0.5 rounded">
+                            <span key={t} className="text-xs bg-[#eef2ff] text-[#3730a3] px-2 py-0.5 rounded-full">
                               {t}
                             </span>
                           ))
                         )}
                       </div>
-                      <p className="text-xs text-[#94a3b8] mb-1">
-                        {new Date(file.createdAt).toLocaleString()} · {file.uploadedByName}
+                      <p className="text-xs text-[#94a3b8] mb-2">
+                        {new Date(file.createdAt).toLocaleDateString()} · {file.uploadedByName}
                       </p>
                       <div className="flex gap-2 pt-2 border-t border-[#e3e6ef]">
                         <button
                           type="button"
                           onClick={() => setPreviewAssetId(file.id)}
-                          className="flex-1 flex items-center justify-center gap-1 text-sm text-[#2563eb] hover:bg-white rounded-lg py-1.5"
+                          className="flex-1 flex items-center justify-center gap-1 text-sm text-[#2563eb] hover:bg-[#eff6ff] rounded-xl py-2 font-medium"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           Preview
@@ -483,7 +560,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                             const payload = (await response.json()) as { url: string };
                             window.open(payload.url, "_blank", "noopener,noreferrer");
                           }}
-                          className="p-1.5 text-[#64748b] hover:text-[#10b981] rounded-lg"
+                          className="px-3 text-[#64748b] hover:text-[#10b981] hover:bg-[#ecfdf5] rounded-xl"
                           aria-label="Download"
                         >
                           <Download className="w-4 h-4" />
@@ -496,7 +573,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
             )}
 
             {!portfolioLoading && portfolioDetail && portfolioFileView === "list" && filteredPortfolioFiles.length > 0 && (
-              <div className="rounded-xl border border-[#e3e6ef] overflow-hidden">
+              <div className="rounded-2xl border border-[#e3e6ef] overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-[#f8fafc] text-left text-xs text-[#64748b] uppercase tracking-wide">
                     <tr>
@@ -512,7 +589,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                       const kind = evidenceKind(file.mimeType);
                       const { icon: Icon, bg, color } = fileIconMeta(kind);
                       return (
-                        <tr key={file.id} className="hover:bg-[#f8fafc]">
+                        <tr key={file.id} className="hover:bg-[#f8fafc] transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center shrink-0`}>

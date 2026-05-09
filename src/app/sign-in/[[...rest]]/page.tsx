@@ -1,11 +1,46 @@
-import { SignIn } from "@clerk/nextjs";
-import type { Metadata } from "next";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Sign in — School Cloud",
-};
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
 
 export default function SignInPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const normalizedUsername = username.trim();
+      const result = await signIn("credentials", {
+        username: normalizedUsername,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid username or password");
+      } else {
+        router.push("/");
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#f0fdf4] via-[#f8f9fc] to-[#eff6ff] p-4">
       <div className="w-full max-w-md space-y-6">
@@ -15,45 +50,50 @@ export default function SignInPage() {
           </div>
           <h1 className="text-2xl font-semibold text-[#0f172a]">Welcome to School Cloud</h1>
           <p className="text-sm text-[#64748b] leading-relaxed">
-            Sign in with your <span className="font-medium text-[#475569]">school phone number</span> (same format
-            you use for WhatsApp, e.g. 0712… or +254712…). If you do not have an account yet, ask your school admin
-            to invite you.
+            Sign in with your username and password. If you do not have an account yet, ask your school admin to create one for you.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-[#bbf7d0] bg-white shadow-lg shadow-[#10b981]/10 p-1 sm:p-2">
-          <SignIn
-            routing="path"
-            path="/sign-in"
-            fallbackRedirectUrl="/"
-            appearance={{
-              layout: { socialButtonsPlacement: "bottom", shimmer: true },
-              variables: {
-                colorPrimary: "#10b981",
-                colorText: "#0f172a",
-                colorTextSecondary: "#64748b",
-                colorBackground: "#ffffff",
-                borderRadius: "0.75rem",
-              },
-              elements: {
-                card: "shadow-none border-0",
-                headerTitle: "text-[#0f172a] font-semibold",
-                headerSubtitle: "text-[#64748b] text-sm",
-                formButtonPrimary: "bg-gradient-to-r from-[#10b981] to-[#059669] hover:opacity-95",
-                footerActionLink: "text-[#059669] font-medium",
-                identityPreviewText: "text-[#0f172a]",
-                formFieldLabel: "text-[#475569] text-sm",
-                dividerLine: "bg-[#e3e6ef]",
-                dividerText: "text-[#94a3b8]",
-              },
-            }}
-          />
-        </div>
-
-        <p className="text-center text-xs text-[#64748b] px-2">
-          Cannot find your account? Contact your school administrator for access, or use your provider&apos;s
-          recovery options if you forgot your sign-in identifier.
-        </p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sign In</CardTitle>
+            <CardDescription>Enter your credentials to access your account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

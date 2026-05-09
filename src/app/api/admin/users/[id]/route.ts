@@ -1,6 +1,4 @@
 import { eq } from "drizzle-orm";
-import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
-import { clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { canManageUsers, getRequestActor } from "@/lib/auth";
@@ -15,14 +13,6 @@ const updateUserSchema = z.object({
   phone: z.union([z.string().min(7), z.null()]).optional(),
   email: z.union([z.string().email(), z.null()]).optional(),
 });
-
-function clerkErr(e: unknown) {
-  if (isClerkAPIResponseError(e)) {
-    return e.errors?.map((x) => x.longMessage || x.message).filter(Boolean).join(" ") || e.message;
-  }
-  if (e instanceof Error) return e.message;
-  return "Clerk error";
-}
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const actor = await getRequestActor();
@@ -64,6 +54,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const db = getDb();
   const updated = await db.update(users).set(patch).where(eq(users.id, params.id)).returning({
     id: users.id,
+    username: users.username,
     fullName: users.fullName,
     email: users.email,
     phone: users.phone,
@@ -73,23 +64,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (!updated[0]) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  if (parsed.data.role) {
-    try {
-      const dbUser = updated[0];
-      const clerk = await clerkClient();
-      const match = dbUser.phone
-        ? (await clerk.users.getUserList({ phoneNumber: [dbUser.phone] })).data[0]
-        : dbUser.email
-          ? (await clerk.users.getUserList({ emailAddress: [dbUser.email] })).data[0]
-          : null;
-      if (match) {
-        await clerk.users.updateUser(match.id, { publicMetadata: { role: parsed.data.role } });
-      }
-    } catch {
-      // ignore
-    }
   }
 
   return NextResponse.json({ data: updated[0] });
@@ -110,27 +84,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
 
   const db = getDb();
   const row = await db
-    .select({ id: users.id, email: users.email, phone: users.phone })
+    .select({ id: users.id })
     .from(users)
     .where(eq(users.id, params.id))
     .limit(1);
 
   if (!row[0]) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  try {
-    const clerk = await clerkClient();
-    const match = row[0].phone
-      ? (await clerk.users.getUserList({ phoneNumber: [row[0].phone] })).data[0]
-      : row[0].email
-        ? (await clerk.users.getUserList({ emailAddress: [row[0].email] })).data[0]
-        : null;
-    if (match) {
-      await clerk.users.deleteUser(match.id);
-    }
-  } catch (e) {
-    return NextResponse.json({ error: `Could not remove Clerk user: ${clerkErr(e)}` }, { status: 502 });
   }
 
   await db.delete(users).where(eq(users.id, params.id));

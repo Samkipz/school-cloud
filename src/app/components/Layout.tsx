@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession, UserButton } from "@clerk/nextjs";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -264,7 +264,12 @@ export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutSh
               <span className="absolute top-1 right-1 w-2 h-2 bg-[#ef4444] rounded-full"></span>
             </button>
 
-            <UserButton afterSignOutUrl="/sign-in" />
+            <button
+              onClick={() => signOut({ callbackUrl: "/sign-in" })}
+              className="px-3 py-2 text-sm font-medium text-[#64748b] hover:text-[#1e293b] hover:bg-[#f1f5f9] rounded-lg transition-all"
+            >
+              Sign out
+            </button>
           </div>
         </header>
 

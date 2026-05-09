@@ -1,6 +1,7 @@
 import path from "node:path";
 import dotenv from "dotenv";
 import postgres from "postgres";
+import bcrypt from "bcryptjs";
 
 dotenv.config({ path: path.join(process.cwd(), ".env.local") });
 
@@ -14,25 +15,33 @@ const sql = postgres(databaseUrl, {
   max: 1,
 });
 
+async function hashPassword(password) {
+  return await bcrypt.hash(password, 12);
+}
+
 try {
     await sql.begin(async (tx) => {
     await tx`TRUNCATE TABLE asset_students, asset_tags, collection_assets, versions, permissions, audit_logs, assets, collections, tags, students, grades, users RESTART IDENTITY CASCADE`;
 
+    const hashedAdminPassword = await hashPassword("admin123");
+    const hashedTeacherPassword = await hashPassword("teacher123");
+    const hashedMarketingPassword = await hashPassword("marketing123");
+
     const [adminUser] = await tx`
-      INSERT INTO users (full_name, email, role, department)
-      VALUES ('System Admin', 'admin@schoolcloud.local', 'admin', 'Administration')
+      INSERT INTO users (username, password_hash, full_name, email, role, department)
+      VALUES ('admin', ${hashedAdminPassword}, 'System Admin', 'admin@schoolcloud.local', 'admin', 'Administration')
       RETURNING id
     `;
 
     const [teacherUser] = await tx`
-      INSERT INTO users (full_name, email, role, department)
-      VALUES ('Grace Wanjiru', 'teacher@schoolcloud.local', 'teacher', 'Academics')
+      INSERT INTO users (username, password_hash, full_name, email, role, department)
+      VALUES ('teacher', ${hashedTeacherPassword}, 'Grace Wanjiru', 'teacher@schoolcloud.local', 'teacher', 'Academics')
       RETURNING id
     `;
 
     const [marketingUser] = await tx`
-      INSERT INTO users (full_name, email, role, department)
-      VALUES ('Daniel Mwangi', 'marketing@schoolcloud.local', 'marketing', 'Communications')
+      INSERT INTO users (username, password_hash, full_name, email, role, department)
+      VALUES ('marketing', ${hashedMarketingPassword}, 'Daniel Mwangi', 'marketing@schoolcloud.local', 'marketing', 'Communications')
       RETURNING id
     `;
 
@@ -45,11 +54,16 @@ try {
     await tx`
       INSERT INTO students (admission_number, full_name, grade_id, class_name, is_active)
       VALUES
-        ('G10-001', 'Emma Njeri', ${grade10.id}, 'Blue', true),
-        ('G10-002', 'Liam Otieno', ${grade10.id}, 'Blue', true),
-        ('G10-003', 'Ava Wambui', ${grade10.id}, 'Green', true),
-        ('G10-004', 'Noah Kiptoo', ${grade10.id}, 'Green', true),
-        ('G10-005', 'Sophia Akinyi', ${grade10.id}, 'Red', true)
+        ('2601', 'Jadon Joseph Kihara', ${grade10.id}, 'East', true),
+        ('2602', 'Mark Kamau', ${grade10.id}, 'East', true),
+        ('2603', 'Eutychus Gatore', ${grade10.id}, 'East', true),
+        ('2604', 'Austine Karau', ${grade10.id}, 'East', true),
+        ('2605', 'Andrew Ndichu', ${grade10.id}, 'East', true),
+        ('2606', 'Michael Kamau', ${grade10.id}, 'East', true),
+        ('2607', 'Dilan Mutua', ${grade10.id}, 'East', true),
+        ('2608', 'Bryaden Muiruri', ${grade10.id}, 'East', true),
+        ('2609', 'Zephania Kamau', ${grade10.id}, 'East', true),
+        ('2610', 'Michael Russo Nderitu', ${grade10.id}, 'East', true)
     `;
 
     await tx`

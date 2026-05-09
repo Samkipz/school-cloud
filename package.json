@@ -15,7 +15,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1040.0",
     "@aws-sdk/s3-request-presigner": "^3.1040.0",
-    "@clerk/nextjs": "^6.39.3",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@mui/icons-material": "7.3.5",
@@ -48,6 +47,7 @@
     "@radix-ui/react-toggle": "1.1.2",
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
+    "bcryptjs": "^3.0.3",
     "canvas-confetti": "1.9.4",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -60,6 +60,7 @@
     "lucide-react": "0.487.0",
     "motion": "12.23.24",
     "next": "^14.2.33",
+    "next-auth": "^4.24.14",
     "next-themes": "0.4.6",
     "pdfjs-dist": "^5.7.284",
     "postgres": "^3.4.9",
@@ -83,6 +84,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.12",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^24.10.1",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",

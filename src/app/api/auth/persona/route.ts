@@ -1,4 +1,3 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestActor } from "@/lib/auth";
@@ -22,16 +21,6 @@ export async function PATCH(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
-
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const clerk = await clerkClient();
-    const user = await clerk.users.getUser(userId);
-    const meta = { ...(user.publicMetadata as Record<string, unknown>), activePersona: parsed.data.persona };
-    await clerk.users.updateUser(userId, { publicMetadata: meta });
 
     await writeAuditLog({
       actorId: actor.dbUserId,

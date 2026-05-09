@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
+import { SessionProvider } from "next-auth/react";
 import "../styles/index.css";
 import { AppToaster } from "./components/AppToaster";
 import { validateServerEnv } from "@/lib/env";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "School Cloud Dashboard UI",
@@ -19,10 +20,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ClerkProvider>
+        <Providers>
           {children}
           <AppToaster />
-        </ClerkProvider>
+        </Providers>
       </body>
     </html>
   );
