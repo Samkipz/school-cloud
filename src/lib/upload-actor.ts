@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/schema";
@@ -12,9 +14,14 @@ export async function resolveActorId(preferredEmail?: string) {
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing[0]) return existing[0].id;
 
+  const username = `actor_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+  const passwordHash = await bcrypt.hash(randomUUID(), 12);
+
   const inserted = await db
     .insert(users)
     .values({
+      username,
+      passwordHash,
       email,
       fullName: DEFAULT_NAME,
       role: "teacher",

@@ -17,7 +17,7 @@ const roleSchema = z.enum(["admin", "teacher", "marketing", "student"]);
 export type AppRole = z.infer<typeof roleSchema>;
 export type AppModule = "portfolio" | "resources" | "media" | "tools";
 
-export type AdminPersona = "admin" | "teacher";
+export type { AdminPersona };
 
 export type RequestActor = {
   userId: string;
@@ -155,11 +155,11 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.sub!;
-        session.user.role = token.role as AppRole;
-        session.user.fullName = token.fullName as string;
-        session.user.dbUserId = token.dbUserId as string;
+      if (token.sub && session.user) {
+        session.user.id = token.sub;
+        session.user.role = (token.role as AppRole) ?? "teacher";
+        session.user.fullName = (token.fullName as string) ?? "";
+        session.user.dbUserId = (token.dbUserId as string) ?? token.sub;
       }
       return session;
     },
