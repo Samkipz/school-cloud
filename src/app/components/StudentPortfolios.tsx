@@ -668,7 +668,9 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                 <span className="font-medium text-[#475569]">{student.fileCount}</span> evidence file
                 {student.fileCount === 1 ? "" : "s"}
               </p>
-              <div className="flex gap-2">
+              <div
+                className={`grid gap-2 ${canManageStudents ? "grid-cols-2" : "grid-cols-1"}`}
+              >
                 {canManageStudents && (
                   <button
                     type="button"
@@ -679,19 +681,20 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                         setStudentDialogOpen(true);
                       }
                     }}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-[#e3e6ef] text-[#64748b] rounded-lg text-sm hover:bg-[#f8fafc]"
+                    className="inline-flex items-center justify-center gap-1.5 min-h-[2.75rem] px-3 border border-[#e3e6ef] text-[#64748b] rounded-lg text-sm font-medium hover:bg-[#f8fafc] w-full"
                   >
-                    <Pencil className="w-4 h-4" />
-                    Edit
+                    <Pencil className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Edit</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => void openPortfolio(student.id)}
-                  className={`flex items-center justify-center gap-2 px-4 py-2 bg-[#1e293b] text-white rounded-lg text-sm font-medium hover:bg-[#334155] transition-colors ${canManageStudents ? "flex-[2]" : "w-full"}`}
+                  aria-label="Open learner portfolio"
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[2.75rem] px-3 bg-[#1e293b] text-white rounded-lg text-sm font-medium hover:bg-[#334155] transition-colors w-full whitespace-nowrap"
                 >
-                  Open portfolio
-                  <ChevronRight className="w-4 h-4 opacity-80" />
+                  <span>Open</span>
+                  <ChevronRight className="w-4 h-4 shrink-0 opacity-80" />
                 </button>
               </div>
             </div>
