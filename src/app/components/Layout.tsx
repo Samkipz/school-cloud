@@ -52,7 +52,8 @@ export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutSh
     setActivePersona(persona);
   }, [persona]);
 
-  const visibleNav = navItems.filter((item) => !item.requiresAdmin || canManageAdmin);
+  const effectiveRole = baseRole === "admin" && persona === "teacher" ? "teacher" : baseRole;
+  const visibleNav = navItems.filter((item) => (!item.requiresAdmin || canManageAdmin) && !(item.path === "/" && effectiveRole === "teacher"));
 
   const currentModule: "portfolio" | "resources" | "media" | "tools" =
     pathname === "/resources"
