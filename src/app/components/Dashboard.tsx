@@ -1,23 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Files, Upload, HardDrive, TrendingUp, FileText, Video, FileImage, MoreVertical, Eye, Download, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Files, Upload, HardDrive, TrendingUp, FileText, Video, FileImage, Search, MoreVertical, Eye, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AssetPreviewModal } from "./AssetPreviewModal";
 import { PdfThumbnail } from "./PdfThumbnail";
 
 const statsTemplate = [
-  { label: "Total Files", icon: Files, color: "from-[#2563eb] to-[#3b82f6]" },
-  { label: "Recent Uploads", icon: Upload, color: "from-[#10b981] to-[#34d399]" },
-  { label: "Storage Used", icon: HardDrive, color: "from-[#8b5cf6] to-[#a78bfa]" },
-  { label: "Active Students", icon: TrendingUp, color: "from-[#f59e0b] to-[#fbbf24]" },
-];
-
-const quickAccess = [
-  { label: "Grade 10 Biology", count: 48, color: "bg-blue-500" },
-  { label: "Grade 11 Chemistry", count: 35, color: "bg-green-500" },
-  { label: "Sports Events", count: 124, color: "bg-purple-500" },
-  { label: "Parent Materials", count: 67, color: "bg-orange-500" },
+  { label: "Total Files", icon: Files },
+  { label: "Recent Uploads", icon: Upload },
+  { label: "Storage Used", icon: HardDrive },
+  { label: "Active Students", icon: TrendingUp },
 ];
 
 type OverviewResponse = {
@@ -50,11 +44,39 @@ const formatBytes = (bytes: number) => {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 };
 
+const formatRelativeTime = (dateString: string) => {
+  const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
+const formatModule = (module: OverviewResponse["recentFiles"][number]["module"]) => {
+  switch (module) {
+    case "portfolio":
+      return "Portfolio";
+    case "resources":
+      return "Resources";
+    case "media":
+      return "Media";
+    case "tools":
+      return "Tools";
+  }
+};
+
 export function Dashboard() {
+  const router = useRouter();
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ id: string; title: string; module: string }[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -104,6 +126,55 @@ export function Dashboard() {
     ];
   }, [overview]);
 
+  const openUploadPanel = () => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new Event("schoolCloudOpenUpload"));
+  };
+
+  const quickAccessItems = useMemo(() => {
+    if (!overview) return [];
+
+    const recentFiles = overview.recentFiles;
+    const areaCounts = overview.actor.learningAreas.reduce<Record<string, number>>((acc, area) => {
+      acc[area.name] = 0;
+      return acc;
+    }, {});
+
+    recentFiles.forEach((file) => {
+      file.learningAreas.forEach((area) => {
+        areaCounts[area] = (areaCounts[area] ?? 0) + 1;
+      });
+    });
+
+    const areaItems = overview.actor.learningAreas.slice(0, 2).map((area) => ({
+      label: area.name,
+      description: `${areaCounts[area.name] ?? 0} recent files`,
+      target: "/resources",
+    }));
+
+    const moduleItems = [
+      { label: "Resources", module: "resources" as const, target: "/resources" },
+      { label: "Media Library", module: "media" as const, target: "/media" },
+    ].map((item) => ({
+      label: item.label,
+      description: `${recentFiles.filter((file) => file.module === item.module).length} recent`,
+      target: item.target,
+    }));
+
+    return areaItems.length > 0 ? [...areaItems, ...moduleItems] : moduleItems;
+  }, [overview]);
+
+  const recentActivityItems = useMemo(() => {
+    return (overview?.recentFiles ?? [])
+      .slice(0, 4)
+      .map((file) => ({
+        id: file.id,
+        title: file.title,
+        subtitle: `${formatModule(file.module)} · ${file.learningAreas[0] ?? "General"}`,
+        time: formatRelativeTime(file.createdAt),
+      }));
+  }, [overview]);
+
   const runtimeRecentFiles = useMemo(() => {
     return (overview?.recentFiles ?? []).map((file) => {
       const isVideo = file.mimeType.includes("video");
@@ -128,9 +199,68 @@ export function Dashboard() {
         <h1 className="text-2xl font-semibold text-[#1e293b] mb-1">
           Welcome back {overview?.actor.fullName?.split(" ")[0] ?? "Teacher"}.
         </h1>
-        <p className="text-[#64748b]">Easily view and manage the school digital files.</p>
+        <p className="text-[#64748b] max-w-2xl">
+          A focused, easy-to-use place for school files, student resources, and classroom media.
+        </p>
         {isLoading && <p className="text-xs text-[#94a3b8] mt-2">Loading dashboard data...</p>}
         {loadError && <p className="text-xs text-[#ef4444] mt-2">{loadError}</p>}
+
+        <div className="grid gap-3 sm:grid-cols-[1.8fr_auto] items-end mt-5">
+          <div className="relative bg-white border border-[#e3e6ef] rounded-3xl overflow-hidden focus-within:ring-2 focus-within:ring-[#2563eb] transition-all">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94a3b8]" />
+            <input
+              type="text"
+              placeholder="Search files, students, or subjects"
+              value={searchQuery}
+              onChange={async (event) => {
+                const value = event.target.value;
+                setSearchQuery(value);
+                if (!value.trim()) {
+                  setSearchResults([]);
+                  return;
+                }
+                setIsSearching(true);
+                const response = await fetch(`/api/search?q=${encodeURIComponent(value)}&limit=6`);
+                setIsSearching(false);
+                if (!response.ok) {
+                  setSearchResults([]);
+                  return;
+                }
+                const payload = (await response.json()) as {
+                  data: { id: string; title: string; module: string }[];
+                };
+                setSearchResults(payload.data ?? []);
+              }}
+              className="w-full pl-14 pr-4 py-3 bg-transparent text-sm text-[#1e293b] placeholder:text-[#94a3b8] focus:outline-none"
+            />
+            {searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-[#e3e6ef] rounded-3xl shadow-lg z-20 overflow-hidden">
+                {searchResults.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      const path = item.module === "portfolio" ? "/portfolios" : `/${item.module}`;
+                      router.push(path);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-[#f8f9fc] transition-colors"
+                  >
+                    <div className="text-sm font-medium text-[#1e293b]">{item.title}</div>
+                    <div className="text-xs text-[#64748b] mt-1">{item.module}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={openUploadPanel}
+            className="inline-flex items-center justify-center gap-2 rounded-3xl border border-[#e3e6ef] bg-white px-4 py-3 text-sm font-medium text-[#1e293b] shadow-sm transition hover:shadow-md"
+          >
+            <Upload className="w-4 h-4 text-[#2563eb]" />
+            Upload file
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -141,10 +271,10 @@ export function Dashboard() {
             className="bg-white rounded-xl p-5 border border-[#e3e6ef] hover:shadow-lg transition-all"
           >
             <div className="flex items-start justify-between mb-3">
-              <div className={`w-12 h-12 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center`}>
-                <stat.icon className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-[#f8fafc] rounded-2xl flex items-center justify-center">
+                <stat.icon className="w-6 h-6 text-[#2563eb]" />
               </div>
-              <span className="text-xs font-medium text-[#10b981] bg-[#d1fae5] px-2 py-1 rounded-full">
+              <span className="text-xs font-medium text-[#475569] bg-[#f1f5f9] px-2 py-1 rounded-full">
                 {stat.change}
               </span>
             </div>
@@ -276,55 +406,48 @@ export function Dashboard() {
         <div className="bg-white rounded-xl border border-[#e3e6ef] p-5">
           <h2 className="font-semibold text-[#1e293b] mb-4">Quick Access</h2>
           <div className="space-y-3">
-            {quickAccess.map((item) => (
-              <button
-                key={item.label}
-                className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-[#f8f9fc] transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 ${item.color} rounded-full`}></div>
-                  <span className="text-sm font-medium text-[#1e293b] group-hover:text-[#2563eb]">
-                    {item.label}
-                  </span>
-                </div>
-                <span className="text-xs text-[#94a3b8] bg-[#f1f5f9] px-2 py-1 rounded-full">
-                  {item.count} files
-                </span>
-              </button>
-            ))}
+            {quickAccessItems.length > 0 ? (
+              quickAccessItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => router.push(item.target)}
+                  className="w-full flex items-center justify-between gap-3 p-3 rounded-2xl border border-[#f3f4f6] bg-[#fafafb] text-left transition hover:border-[#dbeafe] hover:bg-[#f8fafc]"
+                >
+                  <div>
+                    <div className="text-sm font-semibold text-[#1e293b]">{item.label}</div>
+                    <div className="text-xs text-[#64748b] mt-1">{item.description}</div>
+                  </div>
+                  <MoreVertical className="w-4 h-4 text-[#94a3b8]" />
+                </button>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+                Quick access will appear once your first files are uploaded.
+              </div>
+            )}
           </div>
 
           {/* Recent Activity */}
           <div className="mt-6 pt-6 border-t border-[#e3e6ef]">
             <h3 className="text-sm font-semibold text-[#1e293b] mb-3">Recent Activity</h3>
             <div className="space-y-3">
-              <div className="flex gap-3">
-                <div className="w-2 h-2 bg-[#2563eb] rounded-full mt-1.5"></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[#64748b]">
-                    <span className="text-[#1e293b] font-medium">John Smith</span> uploaded 3 files
-                  </p>
-                  <p className="text-xs text-[#94a3b8]">10 minutes ago</p>
+              {recentActivityItems.length > 0 ? (
+                recentActivityItems.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3">
+                    <div className="mt-1.5 h-2.5 w-2.5 rounded-full bg-[#2563eb]" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#1e293b] font-medium truncate">{item.title}</p>
+                      <p className="text-xs text-[#64748b] mt-1">{item.subtitle}</p>
+                    </div>
+                    <div className="text-xs text-[#94a3b8] whitespace-nowrap">{item.time}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+                  Recent activity will show here after your first uploads.
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-2 h-2 bg-[#10b981] rounded-full mt-1.5"></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[#64748b]">
-                    <span className="text-[#1e293b] font-medium">Sarah Lee</span> shared a folder
-                  </p>
-                  <p className="text-xs text-[#94a3b8]">2 hours ago</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-2 h-2 bg-[#f59e0b] rounded-full mt-1.5"></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[#64748b]">
-                    <span className="text-[#1e293b] font-medium">Mike Chen</span> added new tags
-                  </p>
-                  <p className="text-xs text-[#94a3b8]">5 hours ago</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

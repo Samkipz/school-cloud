@@ -393,7 +393,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                     )}
                     {!portfolioLoading && portfolioDetail && (
                       <span className="block mt-1.5 text-xs text-[#94a3b8]">
-                        Curated learning evidence with quick preview and download actions.
+                        Curated learning evidence.
                       </span>
                     )}
                   </p>
@@ -691,7 +691,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                   type="button"
                   onClick={() => void openPortfolio(student.id)}
                   aria-label="Open learner portfolio"
-                  className="inline-flex items-center justify-center gap-1.5 min-h-[2.75rem] px-3 bg-[#1e293b] text-white rounded-lg text-sm font-medium hover:bg-[#334155] transition-colors w-full whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[2.75rem] px-3 border border-[#2563eb] text-[#2563eb] bg-transparent text-sm rounded-lg font-medium hover:bg-gradient-to-r hover:from-[#2563eb] hover:to-[#10b981] hover:text-white hover:border-0 transition-all duration-300 w-full whitespace-nowrap"
                 >
                   <span>Open</span>
                   <ChevronRight className="w-4 h-4 shrink-0 opacity-80" />

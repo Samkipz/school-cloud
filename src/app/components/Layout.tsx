@@ -63,6 +63,14 @@ export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutSh
       ? "tools"
       : "portfolio";
 
+  const searchModule = pathname === "/" ? undefined : currentModule;
+
+  useEffect(() => {
+    const openHandler = () => setIsUploadOpen(true);
+    window.addEventListener("schoolCloudOpenUpload", openHandler);
+    return () => window.removeEventListener("schoolCloudOpenUpload", openHandler);
+  }, []);
+
   return (
     <div className="h-screen bg-[#f8f9fc] flex overflow-hidden">
       {/* Sidebar */}
@@ -145,9 +153,11 @@ export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutSh
                     setSearchResults([]);
                     return;
                   }
-                  const response = await fetch(
-                    `/api/search?q=${encodeURIComponent(value)}&module=${encodeURIComponent(currentModule)}&limit=6`,
-                  );
+                  const params = new URLSearchParams({ q: value, limit: "6" });
+                  if (searchModule) {
+                    params.set("module", searchModule);
+                  }
+                  const response = await fetch(`/api/search?${params.toString()}`);
                   if (!response.ok) return;
                   const payload = (await response.json()) as {
                     data: { id: string; title: string; module: string }[];
@@ -253,10 +263,11 @@ export function Layout({ children, canManageAdmin, baseRole, persona }: LayoutSh
             )}
             <button
               onClick={() => setIsUploadOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-label="Upload files"
             >
               <Upload className="w-4 h-4" />
-              <span>Upload</span>
+              <span className="hidden sm:inline">Upload</span>
             </button>
 
             <button className="relative p-2 text-[#64748b] hover:text-[#1e293b] hover:bg-[#f1f5f9] rounded-lg transition-all">

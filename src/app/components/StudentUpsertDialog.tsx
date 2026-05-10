@@ -152,7 +152,7 @@ export function StudentUpsertDialog({ open, onOpenChange, grades, editing, onSav
           </div>
           <div>
             <label className="text-xs text-[#64748b] block mb-1">Class (optional)</label>
-            <Input value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Form 3A" />
+            <Input value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. East" />
           </div>
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
