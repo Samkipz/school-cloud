@@ -410,7 +410,7 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
             {portfolioDetail && !portfolioLoading && (
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
-                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Total evidence</p>
+                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Total files</p>
                   <p className="text-xl font-semibold text-[#0f172a]">{portfolioDetail.files.length}</p>
                 </div>
                 <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
