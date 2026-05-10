@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FolderOpen, FileText, Video, FileImage, Download, Share2, Star, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { AssetPreviewModal } from "./AssetPreviewModal";
-import { PdfThumbnail } from "./PdfThumbnail";
+import { AssetThumbnail } from "./AssetThumbnail";
 
 type ResourceApiRow = {
   id: string;
@@ -181,11 +181,13 @@ export function StaffResources() {
                 <div className="flex items-center gap-4">
                   {/* Icon */}
                   <div className={`w-12 h-12 ${bg} rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-                    {isPdf ? (
-                      <PdfThumbnail assetId={resource.id} enabled={index < 6} className="w-full h-full" scale={0.45} />
-                    ) : (
-                      <Icon className={`w-6 h-6 ${color}`} />
-                    )}
+                    <AssetThumbnail
+                      assetId={resource.id}
+                      mimeType={resource.mimeType}
+                      enabled={index < 6}
+                      className="w-full h-full"
+                      scale={0.45}
+                    />
                   </div>
 
                   {/* Info */}

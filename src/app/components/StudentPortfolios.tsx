@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { StudentUpsertDialog, type GradeOption } from "./StudentUpsertDialog";
 import { AssetPreviewModal } from "./AssetPreviewModal";
-import { PdfThumbnail } from "./PdfThumbnail";
+import { AssetThumbnail } from "./AssetThumbnail";
 
 const avatarColors = [
   "from-[#2563eb] to-[#3b82f6]",
@@ -406,23 +406,6 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
                 </div>
               </div>
             </div>
-
-            {/* {portfolioDetail && !portfolioLoading && (
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
-                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Total files</p>
-                  <p className="text-xl font-semibold text-[#0f172a]">{portfolioDetail.files.length}</p>
-                </div>
-                <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
-                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Visible now</p>
-                  <p className="text-xl font-semibold text-[#0f172a]">{filteredPortfolioFiles.length}</p>
-                </div>
-                <div className="rounded-xl bg-white/85 backdrop-blur px-4 py-3 border border-[#d8e3f0]">
-                  <p className="text-[11px] uppercase tracking-wider text-[#94a3b8]">Learning areas</p>
-                  <p className="text-xl font-semibold text-[#0f172a]">{Math.max(subjectOptions.length - 1, 0)}</p>
-                </div>
-              </div>
-            )} */}
           </div>
 
           {portfolioDetail && !portfolioLoading && (
@@ -506,19 +489,20 @@ export function StudentPortfolios({ canManageStudents = false }: Props) {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                 {filteredPortfolioFiles.map((file, index) => {
                   const kind = evidenceKind(file.mimeType);
-                  const { icon: Icon, bg, color } = fileIconMeta(kind);
-                  const isPdf = file.mimeType === "application/pdf";
+                  const { bg } = fileIconMeta(kind);
                   return (
                     <div
                       key={file.id}
                       className="group bg-white rounded-2xl border border-[#e3e6ef] p-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.5)] hover:shadow-[0_20px_48px_-28px_rgba(15,23,42,0.45)] hover:border-[#c7d2fe] transition-all"
                     >
                       <div className={`w-full aspect-[4/3] ${bg} rounded-xl flex items-center justify-center overflow-hidden mb-3`}>
-                        {isPdf ? (
-                          <PdfThumbnail assetId={file.id} enabled={index < 12} className="w-full h-full object-cover" scale={0.5} />
-                        ) : (
-                          <Icon className={`w-12 h-12 ${color}`} />
-                        )}
+                        <AssetThumbnail
+                          assetId={file.id}
+                          mimeType={file.mimeType}
+                          enabled={index < 12}
+                          className="w-full h-full object-cover"
+                          scale={0.5}
+                        />
                       </div>
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <h3 className="font-semibold text-[#1e293b] text-sm line-clamp-2">{file.title}</h3>

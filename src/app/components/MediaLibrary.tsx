@@ -5,7 +5,7 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Grid, List, Filter, Download, Share2, Heart, MoreVertical, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { AssetPreviewModal } from "./AssetPreviewModal";
-import { PdfThumbnail } from "./PdfThumbnail";
+import { AssetThumbnail } from "./AssetThumbnail";
 
 const mediaItems = [
   {
@@ -284,15 +284,13 @@ export function MediaLibrary() {
           >
             {/* Image */}
             <div className="relative aspect-[4/3] bg-[#f8f9fc] overflow-hidden">
-              {item.mimeType === "application/pdf" ? (
-                <PdfThumbnail assetId={item.id} enabled={index < 8} className="w-full h-full" scale={0.55} />
-              ) : (
-                <ImageWithFallback
-                  src={item.url}
-                  alt={item.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              )}
+              <AssetThumbnail
+                assetId={item.id}
+                mimeType={item.mimeType}
+                enabled={index < 8}
+                className="w-full h-full"
+                scale={0.55}
+              />
 
               {/* Overlay Actions */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
