@@ -1,6 +1,6 @@
-import { and, desc, eq, ilike } from "drizzle-orm";
+import { and, desc, eq, ilike, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assets } from "@/lib/schema";
+import { assetTags, assets, tags } from "@/lib/schema";
 
 export async function getAssetsByModule(
   moduleName: "portfolio" | "resources" | "media" | "tools",
@@ -23,6 +23,12 @@ export async function getAssetsByModule(
       fileSizeBytes: assets.fileSizeBytes,
       approvalStatus: assets.approvalStatus,
       createdAt: assets.createdAt,
+      tags: sql<string[]>`coalesce((
+        select array_agg(${tags.name})
+        from ${assetTags}
+        inner join ${tags} on ${assetTags.tagId} = ${tags.id}
+        where ${assetTags.assetId} = ${assets.id}
+      ), ARRAY[]::varchar[])`,
     })
     .from(assets)
     .where(and(...filters))

@@ -8,6 +8,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { cn } from "./ui/utils";
+import { predefinedStaffResourceFolders } from "@/lib/staff-resource-folders";
 
 type AppModule = "portfolio" | "resources" | "media" | "tools";
 
@@ -51,6 +52,9 @@ export function UploadModal({ open, onOpenChange, defaultModule, onUploaded }: P
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [learningArea, setLearningArea] = useState("");
+  const [folderName, setFolderName] = useState("");
+  const [customFolder, setCustomFolder] = useState("");
+  const [useCustomFolder, setUseCustomFolder] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [approvalStatus, setApprovalStatus] = useState<"raw" | "approved">("raw");
@@ -72,6 +76,9 @@ export function UploadModal({ open, onOpenChange, defaultModule, onUploaded }: P
     setTitle("");
     setDescription("");
     setLearningArea("");
+    setFolderName("");
+    setCustomFolder("");
+    setUseCustomFolder(false);
     setTagInput("");
     setTags([]);
     setApprovalStatus("raw");
@@ -107,7 +114,19 @@ export function UploadModal({ open, onOpenChange, defaultModule, onUploaded }: P
     loadDependencies();
   }, [moduleName, open]);
 
+  useEffect(() => {
+    if (moduleName !== "resources") {
+      setFolderName("");
+      setCustomFolder("");
+      setUseCustomFolder(false);
+    }
+  }, [moduleName]);
+
   const selectedStudent = useMemo(() => students.find((s) => s.id === studentId) ?? null, [students, studentId]);
+  const selectedFolder = useMemo(() => {
+    if (useCustomFolder) return customFolder.trim();
+    return folderName;
+  }, [customFolder, folderName, useCustomFolder]);
   const scopedLearningAreas = useMemo(() => {
     if (!selectedStudent?.gradeId) return learningAreas;
     return learningAreas.filter((area) => area.gradeId === selectedStudent.gradeId);
@@ -165,14 +184,10 @@ export function UploadModal({ open, onOpenChange, defaultModule, onUploaded }: P
       toast.error("Title is required.");
       return;
     }
-    if (moduleName === "portfolio" && !studentId) {
-      toast.error("Please select a student for portfolio uploads.");
-      return;
-    }
-    if (moduleName === "portfolio" && !learningArea) {
-      toast.error("Please choose a learning area.");
-      return;
-    }
+      if (moduleName === "resources" && !selectedFolder) {
+        toast.error("Please choose or create a folder for staff resources.");
+        return;
+      }
 
     setIsSubmitting(true);
     toast.info(`Uploading ${file.name}...`);
@@ -206,6 +221,7 @@ export function UploadModal({ open, onOpenChange, defaultModule, onUploaded }: P
         new Set(
           [
             ...(moduleName === "portfolio" && learningArea ? [learningArea] : []),
+            ...(moduleName === "resources" && selectedFolder ? [`folder:${selectedFolder}`] : []),
             ...tags,
           ]
             .map((t) => t.trim())
@@ -224,6 +240,7 @@ export function UploadModal({ open, onOpenChange, defaultModule, onUploaded }: P
           mimeType: file.type || "application/octet-stream",
           fileSizeBytes: file.size,
           tags: finalTags,
+          folder: moduleName === "resources" ? selectedFolder : undefined,
           studentId: moduleName === "portfolio" ? studentId : undefined,
           approvalStatus: moduleName === "media" ? approvalStatus : undefined,
         }),
@@ -275,6 +292,43 @@ export function UploadModal({ open, onOpenChange, defaultModule, onUploaded }: P
               </SelectContent>
             </Select>
           </div>
+
+          {moduleName === "resources" && (
+            <div className="grid gap-2">
+              <div className="text-sm font-medium text-[#1e293b]">Folder</div>
+              <Select
+                value={useCustomFolder ? "__new__" : folderName}
+                onValueChange={(value) => {
+                  if (value === "__new__") {
+                    setUseCustomFolder(true);
+                    setFolderName("");
+                    return;
+                  }
+                  setUseCustomFolder(false);
+                  setFolderName(value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  {predefinedStaffResourceFolders.map((folder) => (
+                    <SelectItem key={folder} value={folder}>
+                      {folder}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__new__">Create new folder</SelectItem>
+                </SelectContent>
+              </Select>
+              {useCustomFolder && (
+                <Input
+                  value={customFolder}
+                  onChange={(e) => setCustomFolder(e.target.value)}
+                  placeholder="New folder name"
+                />
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="grid gap-2">

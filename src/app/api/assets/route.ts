@@ -15,6 +15,7 @@ const createAssetSchema = z.object({
   mimeType: z.string().min(1),
   fileSizeBytes: z.number().int().positive(),
   tags: z.array(z.string().min(1)).optional().default([]),
+  folder: z.string().min(1).optional(),
   studentId: z.string().uuid().optional(),
   approvalStatus: z.enum(["raw", "approved", "rejected"]).optional(),
 });
@@ -41,7 +42,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "studentId is required for portfolio uploads" }, { status: 400 });
     }
 
-    const normalizedTags = Array.from(new Set(parsed.data.tags.map((tag) => tag.trim()).filter(Boolean)));
+    const folderTag = parsed.data.folder ? `folder:${parsed.data.folder.trim()}` : undefined;
+    const normalizedTags = Array.from(
+      new Set(
+        [folderTag, ...parsed.data.tags]
+          .filter((tag): tag is string => Boolean(tag))
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      ),
+    );
     if (parsed.data.module === "portfolio" && normalizedTags.length === 0) {
       return NextResponse.json({ error: "At least one tag is required for portfolio uploads" }, { status: 400 });
     }

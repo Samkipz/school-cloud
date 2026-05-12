@@ -8,6 +8,13 @@
       "when": 1778265753757,
       "tag": "0000_large_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778571952829,
+      "tag": "0001_wakeful_warlock",
+      "breakpoints": true
     }
   ]
 }
