@@ -68,6 +68,43 @@ const getTagBadgeStyles = (tag: string) => {
   return "bg-[#f1f5f9] text-[#475569]";
 };
 
+type NoticeboardItem = {
+  id: string;
+  text: string;
+  date: string;
+  color: string;
+};
+
+const NOTICEBOARD_STORAGE_KEY = "staffResourcesNoticeboard";
+
+const defaultNoticeboard: NoticeboardItem[] = [
+  {
+    id: "1",
+    text: "Mid-term exams begin Monday 19th May. All teachers to submit revision schedules by Friday.",
+    date: "Posted 9 May 2026 · Deputy Principal",
+    color: "#378ADD",
+  },
+  {
+    id: "2",
+    text: "Updated remedial timetable for evening session (6:30 pm – 7:30 pm) now available under Schedules.",
+    date: "Posted 7 May 2026 · Academic Office",
+    color: "#1D9E75",
+  },
+  {
+    id: "3",
+    text: "Dorm masters are reminded to submit night prep attendance registers by 10 pm daily.",
+    date: "Posted 5 May 2026 · Dean of Students",
+    color: "#BA7517",
+  },
+];
+
+const noticeboardColorOptions = [
+  { label: "Blue", value: "#378ADD" },
+  { label: "Green", value: "#1D9E75" },
+  { label: "Amber", value: "#BA7517" },
+  { label: "Gray", value: "#64748B" },
+];
+
 export function StaffResources() {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
@@ -78,6 +115,9 @@ export function StaffResources() {
   const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [noticeboard, setNoticeboard] = useState<NoticeboardItem[]>(defaultNoticeboard);
+  const [noticeboardEditorOpen, setNoticeboardEditorOpen] = useState(false);
+  const [editingNoticeboard, setEditingNoticeboard] = useState<NoticeboardItem[]>(defaultNoticeboard);
 
   const fetchResources = async () => {
     try {
@@ -101,7 +141,64 @@ export function StaffResources() {
 
   useEffect(() => {
     fetchResources();
+
+    try {
+      const saved = window.localStorage.getItem(NOTICEBOARD_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as NoticeboardItem[];
+        if (Array.isArray(parsed) && parsed.every((item) => item && typeof item.text === "string")) {
+          setNoticeboard(parsed);
+          setEditingNoticeboard(parsed);
+        }
+      }
+    } catch {
+      // Ignore localStorage parse errors.
+    }
   }, []);
+
+  const openNoticeboardEditor = () => {
+    setEditingNoticeboard(noticeboard);
+    setNoticeboardEditorOpen(true);
+  };
+
+  const saveNoticeboard = () => {
+    setNoticeboard(editingNoticeboard);
+    try {
+      window.localStorage.setItem(NOTICEBOARD_STORAGE_KEY, JSON.stringify(editingNoticeboard));
+      toast.success("Noticeboard updated.");
+    } catch {
+      toast.error("Could not save noticeboard updates.");
+    }
+    setNoticeboardEditorOpen(false);
+  };
+
+  const resetEditingNoticeboard = () => {
+    setEditingNoticeboard(defaultNoticeboard);
+  };
+
+  const addNoticeboardItem = () => {
+    setEditingNoticeboard((current) => [
+      ...current,
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        text: "",
+        date: "Posted today · Office",
+        color: "#dbeafe",
+      },
+    ]);
+  };
+
+  const updateNoticeboardItem = (index: number, field: keyof NoticeboardItem, value: string) => {
+    setEditingNoticeboard((current) => {
+      const next = [...current];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const deleteNoticeboardItem = (index: number) => {
+    setEditingNoticeboard((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
 
   const runtimeResources = useMemo(() => {
     return apiResources.map((item) => {
@@ -135,10 +232,10 @@ export function StaffResources() {
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
     const totalFiles = runtimeResources.length;
     const thisTerm = runtimeResources.filter((r) => r.createdAt >= threeMonthsAgo).length;
-    const announcements = 5; // hardcoded for now
+    const announcements = noticeboard.length;
     const pendingUploads = runtimeResources.filter((r) => r.approvalStatus === "raw").length;
     return { totalFiles, thisTerm, announcements, pendingUploads };
-  }, [runtimeResources]);
+  }, [runtimeResources, noticeboard]);
 
   const folderData = useMemo(() => {
     const folderNames = new Set([...predefinedStaffResourceFolders, ...runtimeResources.map((r) => r.folder)]);
@@ -162,23 +259,7 @@ export function StaffResources() {
     });
   }, [query, runtimeResources, selectedFolder]);
 
-  const announcements = [
-    {
-      text: "Mid-term exams begin Monday 19th May. All teachers to submit revision schedules by Friday.",
-      date: "Posted 9 May 2026 · Deputy Principal",
-      color: "#378ADD",
-    },
-    {
-      text: "Updated remedial timetable for evening session (6:30 pm – 7:30 pm) now available under Schedules.",
-      date: "Posted 7 May 2026 · Academic Office",
-      color: "#1D9E75",
-    },
-    {
-      text: "Dorm masters are reminded to submit night prep attendance registers by 10 pm daily.",
-      date: "Posted 5 May 2026 · Dean of Students",
-      color: "#BA7517",
-    },
-  ];
+  const announcements = noticeboard;
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
@@ -229,7 +310,18 @@ export function StaffResources() {
         <div className="bg-white rounded-lg border border-[#e3e6ef] p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-[#1e293b]">Noticeboard</h2>
-            <span className="text-sm text-[#2563eb] cursor-pointer hover:underline">See all →</span>
+            <div className="flex items-center gap-3">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={openNoticeboardEditor}
+                  className="text-sm text-[#2563eb] hover:underline"
+                >
+                  Edit
+                </button>
+              )}
+              <span className="text-sm text-[#2563eb] cursor-pointer hover:underline">See all →</span>
+            </div>
           </div>
           <div className="space-y-4">
             {announcements.map((announcement, index) => (
@@ -334,6 +426,102 @@ export function StaffResources() {
           fetchResources();
         }}
       />
+
+      {noticeboardEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#e3e6ef] px-6 py-5">
+              <div>
+                <h3 className="text-lg font-semibold text-[#1e293b]">Edit noticeboard</h3>
+                <p className="text-sm text-[#64748b] mt-1">Only admins can update noticeboard announcements.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNoticeboardEditorOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-5 max-h-[70vh] overflow-y-auto">
+              {editingNoticeboard.map((item, index) => (
+                <div key={item.id} className="rounded-3xl border border-[#e3e6ef] p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <label className="text-sm font-medium text-[#1e293b]">Notice text</label>
+                      <textarea
+                        value={item.text}
+                        onChange={(event) => updateNoticeboardItem(index, "text", event.target.value)}
+                        className="mt-2 w-full rounded-xl border border-[#e3e6ef] bg-[#f8f9fc] px-3 py-2 text-sm text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+                        rows={3}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteNoticeboardItem(index)}
+                      className="rounded-lg border border-[#e3e6ef] bg-white px-3 py-2 text-sm text-[#ef4444] hover:bg-[#fef2f2]"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="text-sm font-medium text-[#1e293b]">
+                      Date / author
+                      <input
+                        value={item.date}
+                        onChange={(event) => updateNoticeboardItem(index, "date", event.target.value)}
+                        className="mt-2 w-full rounded-xl border border-[#e3e6ef] bg-[#f8f9fc] px-3 py-2 text-sm text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+                      />
+                    </label>
+                    <label className="text-sm font-medium text-[#1e293b]">
+                      Color
+                      <select
+                        value={item.color}
+                        onChange={(event) => updateNoticeboardItem(index, "color", event.target.value)}
+                        className="mt-2 w-full rounded-xl border border-[#e3e6ef] bg-[#f8f9fc] px-3 py-2 text-sm text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+                      >
+                        {noticeboardColorOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              ))}
+              {editingNoticeboard.length === 0 && (
+                <div className="rounded-3xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-6 text-center text-sm text-[#64748b]">
+                  No noticeboard items yet. Add a new notice to begin.
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={addNoticeboardItem}
+                className="w-full rounded-2xl bg-[#f8fafc] px-4 py-3 text-sm font-medium text-[#2563eb] hover:bg-[#e0efff]"
+              >
+                + Add notice
+              </button>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-[#e3e6ef] bg-[#f8fafc] px-6 py-4 sm:flex-row sm:justify-between sm:items-center">
+              <button
+                type="button"
+                onClick={resetEditingNoticeboard}
+                className="rounded-lg border border-[#e3e6ef] bg-white px-4 py-2 text-sm font-medium text-[#475569] hover:bg-[#f8fafc]"
+              >
+                Reset defaults
+              </button>
+              <button
+                type="button"
+                onClick={saveNoticeboard}
+                className="rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-medium text-white hover:bg-[#1d4ed8]"
+              >
+                Save noticeboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

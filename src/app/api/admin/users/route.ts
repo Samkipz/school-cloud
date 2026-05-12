@@ -8,12 +8,11 @@ import { normalizePhoneE164 } from "@/lib/phone";
 import { users } from "@/lib/schema";
 
 const createUserSchema = z.object({
-  username: z.string().min(3).max(80),
-  fullName: z.string().min(1),
-  phone: z.string().min(7),
-  password: z.string().min(8),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  phone: z.string().min(7).optional(),
   email: z.string().email().optional(),
-  role: z.enum(["admin", "teacher", "marketing", "student"]),
+  role: z.enum(["admin", "teacher"]),
   department: z.string().optional(),
 });
 
@@ -57,51 +56,70 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid user payload" }, { status: 400 });
   }
 
-  const { username, fullName, phone, password, email, role, department } = parsed.data;
-  const phoneNorm = normalizePhoneE164(phone);
+  const { firstName, lastName, phone, email, role, department } = parsed.data;
+  const phoneNorm: { ok: false; error: string } | { ok: true; value: string | undefined } =
+    phone ? normalizePhoneE164(phone) : { ok: true, value: undefined };
   if (!phoneNorm.ok) {
     return NextResponse.json({ error: phoneNorm.error }, { status: 400 });
   }
 
-  try {
-    // Hash the password
-    const passwordHash = await bcrypt.hash(password, 12);
+  const normalizedFirst = firstName.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalizedLast = lastName.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const baseUsername = `${normalizedFirst.slice(0, 1)}.${normalizedLast}@mts`;
+  const initialPassword = `${normalizedLast}12345`;
+  const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
-    const db = getDb();
-    const inserted = await db
-      .insert(users)
-      .values({
-        username: username.trim(),
-        passwordHash,
-        fullName: fullName.trim(),
-        email: email?.trim() || undefined,
-        phone: phoneNorm.value,
-        role,
-        department: department?.trim() || undefined,
-      })
-      .returning({
-        id: users.id,
-        username: users.username,
-        fullName: users.fullName,
-        email: users.email,
-        phone: users.phone,
-        role: users.role,
-        department: users.department,
-        createdAt: users.createdAt,
-      });
+  const db = getDb();
 
-    return NextResponse.json({ data: inserted[0] }, { status: 201 });
-  } catch (error) {
-    const pgCode =
-      error && typeof error === "object" && "code" in error ? String((error as { code?: string }).code) : "";
-    if (pgCode === "23505") {
-      return NextResponse.json(
-        { error: "A user with this username, phone, or email already exists." },
-        { status: 409 },
-      );
+  let username = baseUsername;
+  let inserted;
+  let attempt = 0;
+
+  while (true) {
+    try {
+      const passwordHash = await bcrypt.hash(initialPassword, 12);
+      inserted = await db
+        .insert(users)
+        .values({
+          username,
+          passwordHash,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          fullName: fullName.trim(),
+          email: email?.trim() || undefined,
+          phone: phoneNorm.value,
+          role,
+          department: department?.trim() || undefined,
+        })
+        .returning({
+          id: users.id,
+          username: users.username,
+          fullName: users.fullName,
+          email: users.email,
+          phone: users.phone,
+          role: users.role,
+          department: users.department,
+          createdAt: users.createdAt,
+        });
+      break;
+    } catch (error) {
+      const pgCode =
+        error && typeof error === "object" && "code" in error ? String((error as { code?: string }).code) : "";
+      if (pgCode === "23505" && attempt < 5) {
+        attempt += 1;
+        username = `${normalizedFirst.slice(0, 1)}.${normalizedLast}${attempt}@mts`;
+        continue;
+      }
+      if (pgCode === "23505") {
+        return NextResponse.json(
+          { error: "A user with this username, phone, or email already exists." },
+          { status: 409 },
+        );
+      }
+      const message = error instanceof Error ? error.message : "Could not create user.";
+      return NextResponse.json({ error: message }, { status: 500 });
     }
-
-    const message = error instanceof Error ? error.message : "Could not create user.";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
+
+  return NextResponse.json({ data: inserted[0], initialPassword }, { status: 201 });
 }

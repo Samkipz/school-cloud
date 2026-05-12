@@ -22,8 +22,10 @@ export async function resolveActorId(preferredEmail?: string) {
     .values({
       username,
       passwordHash,
-      email,
+      firstName: DEFAULT_NAME,
+      lastName: DEFAULT_NAME,
       fullName: DEFAULT_NAME,
+      email,
       role: "teacher",
       department: "General",
     })

@@ -22,12 +22,15 @@ type AdminOverview = {
   uploadsLast7Days: number;
 };
 
+type UserRole = "admin" | "teacher" | "marketing" | "student";
+
 type UserRow = {
   id: string;
+  username: string;
   fullName: string;
   email: string | null;
   phone: string | null;
-  role: "admin" | "teacher" | "marketing" | "student";
+  role: UserRole;
   department: string | null;
 };
 
@@ -72,13 +75,11 @@ export function AdminDashboard() {
   const [editingStudent, setEditingStudent] = useState<StudentRow | null>(null);
 
   const [newUser, setNewUser] = useState({
-    fullName: "",
-    phone: "",
-    email: "",
-    password: "",
-    role: "teacher" as UserRow["role"],
-    department: "",
+    firstName: "",
+    lastName: "",
+    role: "teacher" as UserRole,
   });
+  const [addUserOpen, setAddUserOpen] = useState(false);
 
   const [newGradeName, setNewGradeName] = useState("");
   const [newLearningAreaName, setNewLearningAreaName] = useState("");
@@ -215,72 +216,14 @@ export function AdminDashboard() {
 
         {activeTab === "users" && (
           <div className="p-5 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              <input
-                value={newUser.fullName}
-                onChange={(e) => setNewUser((p) => ({ ...p, fullName: e.target.value }))}
-                placeholder="Full name"
-                className="md:col-span-2 px-3 py-2 border border-[#e3e6ef] rounded-lg"
-              />
-              <input
-                value={newUser.phone}
-                onChange={(e) => setNewUser((p) => ({ ...p, phone: e.target.value }))}
-                placeholder="Phone (+country code, digits only)"
-                className="md:col-span-2 px-3 py-2 border border-[#e3e6ef] rounded-lg"
-              />
-              <input
-                value={newUser.email}
-                onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))}
-                placeholder="Email (optional)"
-                type="email"
-                className="md:col-span-2 px-3 py-2 border border-[#e3e6ef] rounded-lg"
-              />
-              <input
-                value={newUser.password}
-                onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))}
-                placeholder="Password (min 8 chars)"
-                type="password"
-                className="md:col-span-2 px-3 py-2 border border-[#e3e6ef] rounded-lg"
-              />
-              <select
-                value={newUser.role}
-                onChange={(e) => setNewUser((p) => ({ ...p, role: e.target.value as UserRow["role"] }))}
-                className="md:col-span-2 px-3 py-2 border border-[#e3e6ef] rounded-lg bg-white"
-              >
-                <option value="admin">admin</option>
-                <option value="teacher">teacher</option>
-                <option value="marketing">marketing</option>
-                <option value="student">student</option>
-              </select>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-sm text-[#64748b] max-w-2xl">
+                Create admin or teacher accounts here. Student accounts should be created in the Students tab.
+              </p>
               <button
-                onClick={async () => {
-                  const response = await fetch("/api/admin/users", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      fullName: newUser.fullName,
-                      phone: newUser.phone,
-                      password: newUser.password,
-                      role: newUser.role,
-                      email: newUser.email || undefined,
-                      department: newUser.department || undefined,
-                    }),
-                  });
-                  const body = (await response.json().catch(() => ({}))) as { data?: UserRow; error?: string };
-                  if (!response.ok) {
-                    toast.error(body.error ?? "Could not create user.");
-                    return;
-                  }
-                  const createdUser = body.data;
-                  if (!createdUser) {
-                    toast.error("Could not create user.");
-                    return;
-                  }
-                  setUsers((prev) => [...prev, createdUser]);
-                  setNewUser({ fullName: "", phone: "", email: "", password: "", role: "teacher", department: "" });
-                  toast.success("User created.");
-                }}
-                className="md:col-span-2 px-3 py-2 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white"
+                type="button"
+                onClick={() => setAddUserOpen(true)}
+                className="px-3 py-2 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white text-sm"
               >
                 Add user
               </button>
@@ -296,30 +239,34 @@ export function AdminDashboard() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <select
-                      value={user.role}
-                      onChange={async (event) => {
-                        const role = event.target.value as UserRow["role"];
-                        const response = await fetch(`/api/admin/users/${user.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ role }),
-                        });
-                        const body = (await response.json().catch(() => ({}))) as { error?: string };
-                        if (!response.ok) {
-                          toast.error(body.error ?? "Could not update user role.");
-                          return;
-                        }
-                        setUsers((prev) => prev.map((entry) => (entry.id === user.id ? { ...entry, role } : entry)));
-                        toast.success("User role updated.");
-                      }}
-                      className="px-3 py-1.5 bg-[#f8f9fc] border border-[#e3e6ef] rounded-lg"
-                    >
-                      <option value="admin">admin</option>
-                      <option value="teacher">teacher</option>
-                      <option value="marketing">marketing</option>
-                      <option value="student">student</option>
-                    </select>
+                    {user.role === "admin" || user.role === "teacher" ? (
+                      <select
+                        value={user.role}
+                        onChange={async (event) => {
+                          const role = event.target.value as UserRow["role"];
+                          const response = await fetch(`/api/admin/users/${user.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ role }),
+                          });
+                          const body = (await response.json().catch(() => ({}))) as { error?: string };
+                          if (!response.ok) {
+                            toast.error(body.error ?? "Could not update user role.");
+                            return;
+                          }
+                          setUsers((prev) => prev.map((entry) => (entry.id === user.id ? { ...entry, role } : entry)));
+                          toast.success("User role updated.");
+                        }}
+                        className="px-3 py-1.5 bg-[#f8f9fc] border border-[#e3e6ef] rounded-lg"
+                      >
+                        <option value="admin">admin</option>
+                        <option value="teacher">teacher</option>
+                      </select>
+                    ) : (
+                      <div className="px-3 py-1.5 bg-[#f8f9fc] border border-[#e3e6ef] rounded-lg text-sm text-[#64748b]">
+                        {user.role}
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -870,6 +817,89 @@ export function AdminDashboard() {
               className="px-3 py-2 rounded-lg bg-[#1e293b] text-white"
             >
               Save
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add user</DialogTitle>
+            <DialogDescription>
+              Create a new admin or teacher account with system-generated credentials.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs text-[#64748b] block mb-1">First name</label>
+              <Input
+                value={newUser.firstName}
+                onChange={(e) => setNewUser((p) => ({ ...p, firstName: e.target.value }))}
+                placeholder="First name"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[#64748b] block mb-1">Last name</label>
+              <Input
+                value={newUser.lastName}
+                onChange={(e) => setNewUser((p) => ({ ...p, lastName: e.target.value }))}
+                placeholder="Last name"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[#64748b] block mb-1">Role</label>
+              <select
+                value={newUser.role}
+                onChange={(e) => setNewUser((p) => ({ ...p, role: e.target.value as UserRole }))}
+                className="w-full px-3 py-2 border border-[#e3e6ef] rounded-lg bg-white text-sm text-[#1e293b]"
+              >
+                <option value="admin">admin</option>
+                <option value="teacher">teacher</option>
+              </select>
+            </div>
+            <p className="text-xs text-[#64748b]">Username and password are generated automatically. The initial password can be changed later.</p>
+          </div>
+          <DialogFooter className="gap-2">
+            <button type="button" onClick={() => setAddUserOpen(false)} className="px-3 py-2 rounded-lg border border-[#e3e6ef]">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const response = await fetch("/api/admin/users", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    firstName: newUser.firstName.trim(),
+                    lastName: newUser.lastName.trim(),
+                    role: newUser.role,
+                  }),
+                });
+                const body = (await response.json().catch(() => ({}))) as {
+                  data?: UserRow;
+                  initialPassword?: string;
+                  error?: string;
+                };
+                if (!response.ok) {
+                  toast.error(body.error ?? "Could not create user.");
+                  return;
+                }
+                const createdUser = body.data;
+                if (!createdUser) {
+                  toast.error("Could not create user.");
+                  return;
+                }
+                setUsers((prev) => [...prev, createdUser]);
+                setNewUser({ firstName: "", lastName: "", role: "teacher" });
+                setAddUserOpen(false);
+                toast.success(
+                  `Created ${createdUser.username}${body.initialPassword ? ` with password ${body.initialPassword}` : ""}`,
+                );
+              }}
+              className="px-3 py-2 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white"
+            >
+              Create user
             </button>
           </DialogFooter>
         </DialogContent>
