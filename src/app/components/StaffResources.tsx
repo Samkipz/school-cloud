@@ -195,7 +195,7 @@ export function StaffResources() {
               className="flex-1 border-none outline-none text-sm"
             />
           </div>
-          <button className="flex items-center justify-center gap-2 bg-[#2563eb] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#1d4ed8] transition-colors w-full sm:w-auto" onClick={() => setUploadOpen(true)}>
+          <button className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#2563eb] to-[#10b981] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#1d4ed8] transition-colors w-full sm:w-auto" onClick={() => setUploadOpen(true)}>
             <Upload className="w-4 h-4" />
             Upload
           </button>
