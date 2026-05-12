@@ -183,10 +183,10 @@ export function StaffResources() {
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       {/* Topbar */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-[#1e293b]">Staff Resources</h1>
-        <div className="flex gap-3 items-center">
-          <div className="flex items-center gap-2 bg-white border border-[#e3e6ef] rounded-lg px-3 py-2 w-64">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch md:items-center w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-white border border-[#e3e6ef] rounded-lg px-3 py-2 w-full sm:w-auto">
             <Search className="w-4 h-4 text-[#94a3b8]" />
             <input
               value={query}
@@ -195,7 +195,7 @@ export function StaffResources() {
               className="flex-1 border-none outline-none text-sm"
             />
           </div>
-          <button className="flex items-center gap-2 bg-[#2563eb] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#1d4ed8] transition-colors" onClick={() => setUploadOpen(true)}>
+          <button className="flex items-center justify-center gap-2 bg-[#2563eb] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#1d4ed8] transition-colors w-full sm:w-auto" onClick={() => setUploadOpen(true)}>
             <Upload className="w-4 h-4" />
             Upload
           </button>
